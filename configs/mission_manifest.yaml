@@ -1,0 +1,127 @@
+# APSE OS - Mission Manifest
+# Declare your robot's identity, hardware, AI model and mission.
+# The APSE runtime compiles this and executes autonomously.
+# Version: 0.1
+
+apse:
+  version: "0.1"
+  os: "apse-os"
+
+# ─── Device Identity ────────────────────────────────────────────────
+device:
+  name: "industrial-arm-01"
+  serial: "APSE-2026-001"
+  profile: "industrial"       # micro | industrial | deep-space
+  location: "factory-floor-3"
+
+# ─── Runtime Configuration ──────────────────────────────────────────
+runtime:
+  scheduler: "apse-rt"
+  safety_mode: "hardened"     # hardened | standard | permissive
+  communication: "auto"       # auto | shm | mesh | dtn
+  fault_containment: true
+  hot_restart: true
+
+# ─── AI Configuration ───────────────────────────────────────────────
+ai:
+  provider: "local"                    # local | google | github-models | huggingface
+  model: "openvla-small"               # model ID in provider registry
+  fallback_provider: "google"
+  fallback_model: "gemini-2.5-flash"
+  accelerator: "auto"                  # auto | gpu | npu | tpu | cpu
+  quantization: "int8"                 # fp32 | fp16 | int8 | int4
+  confidence_threshold: 0.75
+  target_latency_ms: 15
+
+# ─── Mission Definition ─────────────────────────────────────────────
+mission:
+  goal: "inspect_surface_defects"
+  description: "Inspect industrial surface for defects using vision and report findings."
+  latency_budget_ms: 15
+  timeout_s: 300
+  retry_on_failure: true
+  max_retries: 3
+
+# ─── Hardware & Sensors ─────────────────────────────────────────────
+hardware:
+  sensors:
+    - id: "camera.primary"
+      type: "camera"
+      resolution: "1920x1080"
+      fps: 30
+      interface: "usb3"
+    - id: "lidar.front"
+      type: "lidar"
+      range_m: 20.0
+      interface: "ethernet"
+    - id: "imu.main"
+      type: "imu"
+      interface: "i2c"
+  actuators:
+    - id: "arm.joint_controller"
+      type: "7dof_arm"
+      interface: "can_bus"
+      dof: 7
+
+# ─── Skills (Cognitive Capabilities) ────────────────────────────────
+skills:
+  - name: "defect_detection"
+    description: "Detect surface defects from camera feed"
+    input: "camera.primary.raw"
+    output: "robot.events.defect"
+    tool_use:
+      - "collision_checker"
+      - "ik_solver"
+    confidence_min: 0.80
+
+  - name: "position_navigation"
+    description: "Navigate arm to inspection position"
+    input: "mission.target_position"
+    output: "arm.joint_controller.command"
+    tool_use:
+      - "ik_solver"
+      - "path_planner"
+
+# ─── Safety Constraints ─────────────────────────────────────────────
+safety:
+  attestation: true
+  signed_packages: true
+  capability_tokens: true
+  kinematic_limits:
+    joint_min: [-3.14, -3.14, -3.14, -3.14, -3.14, -3.14, -3.14]
+    joint_max: [ 3.14,  3.14,  3.14,  3.14,  3.14,  3.14,  3.14]
+    velocity_max: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+  geofences:
+    - name: "workspace"
+      x_min: -1.5
+      x_max: 1.5
+      y_min: -1.5
+      y_max: 1.5
+      z_min: 0.0
+      z_max: 2.0
+
+# ─── Maintenance ────────────────────────────────────────────────────
+maintenance:
+  rul_warn_threshold: 0.30
+  rul_critical_threshold: 0.10
+  telemetry_interval_s: 5
+  auto_alert: true
+
+# ─── Provider Registry ──────────────────────────────────────────────
+providers:
+  google:
+    enabled: false                  # set GOOGLE_API_KEY env var to enable
+    portal: "https://ai.google.dev/aistudio"
+    license: "provider-terms"
+  github_models:
+    enabled: false                  # set GITHUB_TOKEN env var to enable
+    portal: "https://github.com/marketplace/models"
+    license: "per-model-card"
+  huggingface:
+    enabled: false                  # set HF_TOKEN env var to enable
+    portal: "https://huggingface.co/models"
+    license: "per-model-card"
+  local:
+    enabled: true
+    runtime: "onnx"
+    license: "apache-2.0"
